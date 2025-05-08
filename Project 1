@@ -1,0 +1,37 @@
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import CountVectorizer
+
+# Load data
+users = pd.read_csv('users.csv')
+movies = pd.read_csv('movies.csv')
+ratings = pd.read_csv('ratings.csv')
+
+# Merge user ratings with movie genres
+data = pd.merge(ratings, movies, on='movie_id')
+
+# Build a user profile from ratings
+def build_user_profile(user_id):
+    user_data = data[data['user_id'] == user_id]
+    genre_matrix = user_data['genres'].str.get_dummies(sep='|')
+    weights = user_data['rating'].values.reshape(-1, 1)
+    profile = genre_matrix.mul(weights.flatten(), axis=0).sum()
+    return profile
+
+# Recommend movies for a pair (match)
+def recommend_for_match(user1, user2, top_n=3):
+    profile1 = build_user_profile(user1)
+    profile2 = build_user_profile(user2)
+    match_profile = (profile1 + profile2) / 2
+    
+    movie_genres = movies['genres'].str.get_dummies(sep='|')
+    similarities = cosine_similarity([match_profile], movie_genres)[0]
+    
+    movies['similarity'] = similarities
+    recommended = movies.sort_values(by='similarity', ascending=False).head(top_n)
+    return recommended[['title', 'genres', 'similarity']]
+
+# Example: Recommend for user 1 and user 2 match
+recommendations = recommend_for_match(1, 2)
+print("Recommended Movies for Match:")
+print(recommendations)
